@@ -5,6 +5,10 @@ __pycache__/
 # C extensions
 *.so
 
+# model files
+model/
+.idea/
+
 # Distribution / packaging
 .Python
 env/
