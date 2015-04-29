@@ -1,29 +1,45 @@
 __author__ = 'DY'
 
 from main import *
+import time
 from cs224d.datasets.data_utils import *
 
 # Implement your skip-gram and CBOW models here
 
 # Interface to the dataset for negative sampling
 # dataset = type('dummy', (), {})()
+
 class DummyDataset:
     def __init__(self):
+        self.seed = np.uint32(time.time())
         self._tokens = dict([("a",0), ("b",1), ("c",2),("d",3),("e",4)])
 
     def tokens(self):
         return self._tokens
-
+    #
+    # def sampleTokenIdx(self):
+    #     if hasattr(self, "_sampleTokenIdx") and self._sampleTokenIdx:
+    #         return self._sampleTokenIdx
+    #     # random.seed(31415)
+    #     # np.random.seed(9265)
+    #     self._sampleTokenIdx = random.randint(0,4)
+    #     return self._sampleTokenIdx
+    # def getRandomContext(self, C):
+    #     if hasattr(self, "_getRandomContext") and self._getRandomContext:
+    #         return self._getRandomContext
+    #     tokens = ["a", "b", "c", "d", "e"]
+    #     # random.seed(31415)
+    #     # np.random.seed(9265)
+    #     self._getRandomContext = [tokens[random.randint(0, 4)] for i in xrange(2*C+1)]
+    #     return self._getRandomContext
     def sampleTokenIdx(self):
-        if hasattr(self, "_sampleTokenIdx") and self._sampleTokenIdx:
-            return self._sampleTokenIdx
-        self._sampleTokenIdx = random.randint(0,4)
+        np.random.seed(self.seed)
+        self._sampleTokenIdx = np.random.randint(0, 4)
         return self._sampleTokenIdx
     def getRandomContext(self, C):
-        if hasattr(self, "_getRandomContext") and self._getRandomContext:
-            return self._getRandomContext
         tokens = ["a", "b", "c", "d", "e"]
-        self._getRandomContext = [tokens[random.randint(0, 4)] for i in xrange(2*C+1)]
+        np.random.seed(self.seed)
+        self._getRandomContext = [tokens[np.random.randint(0, 4)] for _ in xrange(2*C+1)]
         return self._getRandomContext
 dataset = DummyDataset()
 random.seed(31415)
@@ -93,7 +109,7 @@ def softmaxCostAndGradient_wrapper(wordVectors):
 gradcheck_naive(softmaxCostAndGradient_wrapper, wordVectors)
 
 
-def negSamplingCostAndGradient(predicted, center, outputVectors, K=10):
+def negSamplingCostAndGradient(predicted, target, outputVectors, K=10):
     """ Negative sampling cost function for word2vec models """
     ###################################################################
     # Implement the cost and gradients for one predicted word vector  #
@@ -109,25 +125,53 @@ def negSamplingCostAndGradient(predicted, center, outputVectors, K=10):
 
     ### YOUR CODE HERE
 
-    cost = predicted.dot(outputVectors[center])
-    cost = 1 / (1 + np.exp(-cost))
-    gradPred = (1 - cost) * outputVectors[center]
+    # cost = predicted.dot(outputVectors[target])
+    # cost = 1 / (1 + np.exp(-cost))
+    # gradPred = (1 - cost) * outputVectors[target]
+    #
+    # grad = np.zeros(outputVectors.shape)
+    #
+    # grad[target] = (1 - cost) * predicted
+    #
+    # cost = np.log(cost)
+    #
+    # for i in range(K):
+    #     dummy_sample_token_idx = dataset.sampleTokenIdx()
+    #     negVectors = outputVectors[dummy_sample_token_idx]
+    #     negCost = -negVectors.dot(predicted)
+    #     negCost = 1 / (1 + np.exp(-negCost))
+    #     gradPred += (1 - negCost) * -outputVectors[dummy_sample_token_idx]
+    #     negGrad = (1 - negCost) * -predicted
+    #     grad[dummy_sample_token_idx] += negGrad
+    #     cost += np.log(negCost)
+
+
+    negindx = [target]
+    for _ in xrange(K):
+        negindx.append(dataset.sampleTokenIdx())
+    # negindx = [dataset.sampleTokenIdx() for _ in xrange(K)]
+    # negVecs = np.array((K + 1, outputVectors.shape[1]))
+    negVecs = outputVectors[negindx]
+
+    labels = np.zeros((K + 1))
+    labels[0] = 1
+    # predicted.shape = (1, predicted.shape[0])
+    tmpM = predicted.dot(negVecs.T)
+    tmp = 1 / (1 + np.exp(-tmpM))
+    tmp = (labels - tmp)
+    gradPred = np.dot(tmp, negVecs)
+    gradOut = np.outer(tmp, predicted)
 
     grad = np.zeros(outputVectors.shape)
+    for i in xrange(len(gradOut)):
+        grad[negindx[i]] += gradOut[i]
+    # grad[negindx] = gradOut
 
-    grad[center] = (1 - cost) * predicted
-
-    cost = np.log(cost)
-
-    for i in range(K):
-        dummy_sample_token_idx = dataset.sampleTokenIdx()
-        negVectors = outputVectors[dummy_sample_token_idx]
-        negCost = -negVectors.dot(predicted)
-        negCost = 1 / (1 + np.exp(-negCost))
-        gradPred += (1 - negCost) * -outputVectors[dummy_sample_token_idx]
-        negGrad = (1 - negCost) * -predicted
-        grad[dummy_sample_token_idx] += negGrad
-        cost += np.log(negCost)
+    tmpM = -tmpM
+    tmpM[0] = -tmpM[0]
+    cost = 1 / (1 + np.exp(-tmpM))
+    # print "cost:", cost
+    cost = np.sum(np.log(cost))
 
     ### END YOUR CODE
 
@@ -137,10 +181,10 @@ print "==== Gradient check for negSamplingCostAndGradient ==="
 
 def negSamplingCostAndGradient_wrapper(wordVectors):
     N = wordVectors.shape[0] / 2
-    cost, gradPred, gradOut = negSamplingCostAndGradient(wordVectors[0], 0, wordVectors[N:,:])
+    cost, gradPred, gradOut = negSamplingCostAndGradient(wordVectors[0], 0, wordVectors[N:, :])
     grad = np.zeros(wordVectors.shape)
     grad[0] = gradPred
-    grad[N:,:] = gradOut
+    grad[N:, :] = gradOut
     return cost, grad
 gradcheck_naive(negSamplingCostAndGradient_wrapper, wordVectors)
 
@@ -183,7 +227,8 @@ def skipgram(currentWord, C, contextWords, tokens, inputVectors, outputVectors, 
 
     ### END YOUR CODE
 
-    return cost / 2 / C, gradIn / 2 / C, gradOut / 2 / C
+    # return cost / 2 / C, gradIn / 2 / C, gradOut / 2 / C
+    return cost, gradIn, gradOut
 
 print "==== Gradient check for skip-gram ===="
 def word2vec_sgd_wrapper(word2vecModel, C, word2vecCostAndGradient, wordVectors):
@@ -215,21 +260,18 @@ import os.path as op
 def load_saved_params():
     """ A helper function that loads previously saved parameters and resets iteration start """
     st = 0
-    for f in glob.glob("saved_params_*.npy"):
+    for f in glob.glob("model/saved_params_*.npy"):
         iter = int(op.splitext(op.basename(f))[0].split("_")[2])
         if (iter > st):
             st = iter
 
     if st > 0:
-        return st, np.load("saved_params_%d.npy" % st)
+        return st, np.load("model/saved_params_%d.npy" % st)
     else:
         return st, None
 
 def save_params(iter, params):
-    np.tensordot()
-    np.reshape()
-    np.dot()
-    np.save("saved_params_%d.npy" % iter, params)
+    np.save("model/saved_params_%d.npy" % iter, params)
 
 def sgd(f, x0, step, iterations, postprocessing = None, useSaved = False):
     """ Stochastic Gradient Descent """
@@ -302,7 +344,7 @@ C = 5
 random.seed(31415)
 np.random.seed(9265)
 wordVectors = normalizeRows(np.random.randn(nWords * 2, dimVectors))
-wordVectors0 = sgd(lambda wordVectors: word2vec_sgd_wrapper(skipgram, C, softmaxCostAndGradient, wordVectors), wordVectors, 10.0, 200000, normalizeRows, True)
+wordVectors0 = sgd(lambda wordVectors: word2vec_sgd_wrapper(skipgram, C, negSamplingCostAndGradient, wordVectors), wordVectors, 10.0, 200000, normalizeRows, True)
 
 # just use the output vectors
 wordVectors = (wordVectors0[:nWords,:] + wordVectors0[nWords:,:]) / 2.0
