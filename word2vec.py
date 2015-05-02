@@ -227,8 +227,8 @@ def skipgram(currentWord, C, contextWords, tokens, inputVectors, outputVectors, 
 
     ### END YOUR CODE
 
-    # return cost / 2 / C, gradIn / 2 / C, gradOut / 2 / C
-    return cost, gradIn, gradOut
+    return cost / 2 / C, gradIn / 2 / C, gradOut / 2 / C
+    # return cost, gradIn, gradOut
 
 print "==== Gradient check for skip-gram ===="
 def word2vec_sgd_wrapper(word2vecModel, C, word2vecCostAndGradient, wordVectors):
@@ -316,7 +316,7 @@ def sgd(f, x0, step, iterations, postprocessing = None, useSaved = False):
         ### You might want to print the progress every few iterations.
         random_context = dataset.getRandomContext()
         cost, xdelta = f(x)
-        x -= step * xdelta
+        x += step * xdelta
         x = postprocessing(x)
         ### END YOUR CODE
 
@@ -361,14 +361,7 @@ wordVectors = (wordVectors0[:nWords,:] + wordVectors0[nWords:,:]) / 2.0
 visualizeWords = ["the", "a", "an", ",", ".", "?", "!", "``", "''", "--", "good", "great", "cool", "brilliant", "wonderful", "well", "amazing", "worth", "sweet", "warm", "enjoyable", "boring", "bad", "garbage", "waste", "disaster", "dumb", "embarrassment", "annoying", "disgusting"]
 visualizeIdx = [tokens[word] for word in visualizeWords]
 visualizeVecs = wordVectors[visualizeIdx, :]
-covariance = visualizeVecs.T.dot(visualizeVecs)
-U,S,V = np.linalg.svd(covariance)
-coord = (visualizeVecs - np.mean(visualizeVecs, axis=0)).dot(U[:,0:2])
 
-for i in xrange(len(visualizeWords)):
-    plt.text(coord[i,0], coord[i,1], visualizeWords[i], bbox=dict(facecolor='green', alpha=0.1))
+import visualizing as vs
 
-plt.xlim((np.min(coord[:,0]), np.max(coord[:,0])))
-plt.ylim((np.min(coord[:,1]), np.max(coord[:,1])))
-
-plt.show()
+vs.visualize(visualizeVecs, visualizeWords, "word2vec")

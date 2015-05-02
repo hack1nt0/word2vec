@@ -21,18 +21,8 @@ print checkVecs
 # model = model.load_word2vec_format("baseline.model")
 
 visualizeWords = ["the", "a", "an", ",", ".", "?", "!", "``", "''", "--", "good", "great", "cool", "brilliant", "wonderful", "well", "amazing", "worth", "sweet", "warm", "enjoyable", "boring", "bad", "garbage", "waste", "disaster", "dumb", "embarrassment", "annoying", "disgusting"]
-# visualizeIdx = [model.vocab[word].index for word in visualizeWords]
-# visualizeVecs = model[visualizeIdx, :]
 visualizeVecs = np.array([model[w] for w in visualizeWords])
-covariance = visualizeVecs.T.dot(visualizeVecs)
-U,S,V = np.linalg.svd(covariance)
-coord = (visualizeVecs - np.mean(visualizeVecs, axis=0)).dot(U[:,0:2])
-print coord
 
-for i in xrange(len(visualizeWords)):
-    plt.text(coord[i,0], coord[i,1], visualizeWords[i], bbox=dict(facecolor='green', alpha=0.1))
+import visualizing as vs
 
-plt.xlim((np.min(coord[:,0]), np.max(coord[:,0])))
-plt.ylim((np.min(coord[:,1]), np.max(coord[:,1])))
-
-plt.show()
+vs.visualize(visualizeVecs, visualizeWords, "baseline")
